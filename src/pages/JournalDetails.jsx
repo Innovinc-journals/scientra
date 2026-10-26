@@ -316,7 +316,6 @@ export default function JournalDetails() {
                   <p className="text-xs text-gray-500 mb-2">{article.authors?.join(' · ')}</p>
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
                     <span className="font-medium text-navy-900">{article.journalTitle}</span>
-                    {article.doi && <span>doi {article.doi}</span>}
                   </div>
                 </article>
               ))}
@@ -344,7 +343,6 @@ export default function JournalDetails() {
                   <p className="text-xs text-gray-500 mb-2">{article.authors?.join(' · ')}</p>
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
                     <span className="font-medium text-navy-900">{article.journalTitle}</span>
-                    {article.doi && <span>doi {article.doi}</span>}
                   </div>
                 </article>
               ))}

@@ -160,15 +160,11 @@ export default function ArticleDetails() {
             {article.history?.revised && <span>Revised: <strong className="text-navy-900">{article.history.revised}</strong></span>}
             {article.history?.accepted && <span>Accepted: <strong className="text-navy-900">{article.history.accepted}</strong></span>}
             {article.history?.online && <span>Published: <strong className="text-navy-900">{article.history.online}</strong></span>}
-            {article.doi && (
-              <span className="ml-auto font-mono text-[10px] bg-gray-50 border border-gray-200 rounded px-2 py-0.5 text-gray-600">
-                DOI: {article.doi}
-              </span>
-            )}
+
           </div>
 
           {/* ─── Action Bar ─── */}
-          <div className="flex flex-wrap items-center gap-3 py-4 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-3 py-2">
             <button className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm">
               <Download className="w-4 h-4" />
               Download PDF
