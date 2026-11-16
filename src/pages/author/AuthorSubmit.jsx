@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/apiClient'
 import { useAuth } from '../../auth/AuthContext'
-import { ROLES, roleHome } from '../../auth/roles'
+import { ROLES } from '../../auth/roles'
 import { toApiError } from '../../api/errors'
 
 const ARTICLE_TYPES = [
@@ -301,29 +301,23 @@ export default function AuthorSubmit() {
     return (
       <div className="max-w-xl mx-auto py-16 px-4">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center space-y-5">
-          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6" />
+          <div className="w-14 h-14 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center mx-auto">
+            <Lock className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-navy-950">Author Account Required</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            Only verified <strong>AUTHOR</strong> accounts can submit manuscripts. You are currently signed in as{' '}
-            <strong>{user.role}</strong> ({user.email}).
+          <h2 className="text-2xl font-bold text-navy-950">Please Login as an Author</h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Manuscript submissions require a verified Author account.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link to={roleHome(user.role)}>
-              <Button variant="outline" className="w-full sm:w-auto px-6 h-11 rounded-xl">
-                Go to {user.role} Workspace
-              </Button>
-            </Link>
+          <div className="flex justify-center pt-2">
             <Button
               type="button"
               onClick={async () => {
                 await logout()
                 navigate('/login', { state: { from: location } })
               }}
-              className="w-full sm:w-auto px-6 h-11 rounded-xl"
+              className="px-8 h-11 rounded-xl"
             >
-              Sign Out &amp; Login as Author
+              Login as Author
             </Button>
           </div>
         </div>
