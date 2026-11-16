@@ -3,11 +3,14 @@ import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ChevronDown } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { cn } from '../../utils/cn'
+import { useAuth } from '../../auth/AuthContext'
+import { roleHome } from '../../auth/roles'
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileAboutOpen, setIsMobileAboutOpen] = useState(false)
   const location = useLocation()
+  const { user, isAuthenticated } = useAuth()
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -138,6 +141,21 @@ export function Navbar() {
             </div>
             
             <div className="flex items-center space-x-4 border-l border-gray-200 pl-6">
+              {isAuthenticated && user ? (
+                <Link
+                  to={roleHome(user.role)}
+                  className="text-sm font-semibold text-gray-700 hover:text-primary-600 transition-colors"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="text-sm font-semibold text-gray-700 hover:text-primary-600 transition-colors"
+                >
+                  Sign in
+                </Link>
+              )}
               <Link to="/submit">
                 <Button>Submit your manuscript</Button>
               </Link>
@@ -228,6 +246,14 @@ export function Navbar() {
             )}
           </div>
           <div className="pt-4 flex flex-col space-y-3 border-t border-gray-100">
+            <Link
+              to={isAuthenticated && user ? roleHome(user.role) : '/login'}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Button variant="outline" className="w-full justify-center">
+                {isAuthenticated && user ? 'Dashboard' : 'Sign in'}
+              </Button>
+            </Link>
             <Link to="/submit" onClick={() => setIsMobileMenuOpen(false)}>
               <Button className="w-full justify-center">Submit your manuscript</Button>
             </Link>

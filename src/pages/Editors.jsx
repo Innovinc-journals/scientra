@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useOutletContext, Link } from 'react-router-dom'
 import { ShieldCheck, Mail, Globe, Award, BookOpen, Users, GraduationCap, Star, X } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
+import { api } from '../api/apiClient'
 
 // ... editors array is unchanged ...
 const editors = [
@@ -53,20 +54,52 @@ export default function Editors() {
   const isJournalContext = !!journalId
 
   const [selectedEditor, setSelectedEditor] = useState(null)
+  const [apiEditors, setApiEditors] = useState([])
 
-  const displayedEditors = isJournalContext
-    ? (journal?.chiefEditor
-        ? [{
-            name: journal.chiefEditor.name,
-            role: 'Chief Editor',
-            institution: journal.chiefEditor.affiliation,
-            bio: journal.chiefEditor.biography || journal.chiefEditor.bio || '',
-            image: journal.chiefEditor.image,
-            specialty: '',
-            email: 'support@scientrajournals.org'
-          }]
-        : [])
-    : editors
+  useEffect(() => {
+    let alive = true
+    const loader = isJournalContext
+      ? api.journals.getEditorialBoard(journalId, { page_size: 100 })
+      : api.editorialBoard.getAll({ page_size: 100 })
+    loader
+      .then((items) => {
+        if (!alive || !Array.isArray(items) || items.length === 0) return
+        setApiEditors(
+          items.map((m) => ({
+            name: m.name || m.full_name || 'Editorial Board Member',
+            role: m.role || m.board_role || 'Board Member',
+            specialty: m.specialty || m.expertise || '',
+            institution: m.institution || m.affiliation || '',
+            bio: m.bio || m.biography || '',
+            image: m.image || m.avatar_url || '/editors/Nguyen Q. Chinh, Hungary.png',
+            email: m.email || 'support@scientrajournals.org',
+          })),
+        )
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [isJournalContext, journalId])
+
+  const displayedEditors =
+    apiEditors.length > 0
+      ? apiEditors
+      : isJournalContext
+      ? journal?.chiefEditor
+        ? [
+            {
+              name: journal.chiefEditor.name,
+              role: 'Chief Editor',
+              institution: journal.chiefEditor.affiliation,
+              bio: journal.chiefEditor.biography || journal.chiefEditor.bio || '',
+              image: journal.chiefEditor.image,
+              specialty: '',
+              email: 'support@scientrajournals.org',
+            },
+          ]
+        : []
+      : editors
 
   return (
     <div className={`min-h-screen ${isJournalContext ? '' : 'bg-gray-50 pb-20'}`}>

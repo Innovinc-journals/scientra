@@ -1,6 +1,17 @@
 import React from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Users, FileText, Settings, LogOut, LayoutDashboard } from 'lucide-react'
+import {
+  BookOpen,
+  Users,
+  FileText,
+  Settings,
+  LogOut,
+  LayoutDashboard,
+  CheckCircle,
+  MessageSquare,
+  DollarSign,
+  Layers,
+} from 'lucide-react'
 import { cn } from '../utils/cn'
 import { useAuth } from '../auth/AuthContext'
 import { ROLES } from '../auth/roles'
@@ -12,10 +23,14 @@ export function AdminLayout() {
 
   const allNavItems = [
     { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
+    { name: 'Manuscripts', path: '/admin/manuscripts', icon: <FileText className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
+    { name: 'Production', path: '/admin/production', icon: <CheckCircle className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
+    { name: 'APC Waivers', path: '/admin/apc-waivers', icon: <DollarSign className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
     { name: 'Employees', path: '/admin/employees', icon: <Users className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
     { name: 'Applications', path: '/admin/applications', icon: <FileText className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
-    { name: 'Manuscripts', path: '/admin/manuscripts', icon: <FileText className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
-    { name: 'Settings', path: '/admin/settings', icon: <Settings className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
+    { name: 'Inquiries', path: '/admin/inquiries', icon: <MessageSquare className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
+    { name: 'Catalog', path: '/admin/catalog', icon: <Layers className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
+    { name: 'Settings & Policies', path: '/admin/settings', icon: <Settings className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
   ]
   const navItems = allNavItems.filter((item) => item.roles.includes(user?.role))
 

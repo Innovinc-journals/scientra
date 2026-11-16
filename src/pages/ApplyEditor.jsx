@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
-import { BookOpen, User, Building, Link as LinkIcon, FileText, CheckCircle, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BookOpen, User, Mail, Building, Link as LinkIcon, FileText, CheckCircle, ArrowRight } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { FormError, FieldError } from '../components/auth/AuthCard'
+import { api } from '../api/apiClient'
+import { toApiError, fieldErrorMap } from '../api/errors'
 
 export default function ApplyEditor() {
   const [formData, setFormData] = useState({
@@ -16,20 +19,53 @@ export default function ApplyEditor() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+    setFieldErrors({})
+
+    const cover = formData.coverLetter.trim()
+    if (cover.length < 50) {
+      setFieldErrors({ coverLetter: 'Please write at least 50 characters describing your editorial experience and motivation.' })
+      return
+    }
+    const url = formData.scholarUrl.trim()
+    if (!/^https:\/\//i.test(url)) {
+      setFieldErrors({ scholarUrl: 'Please enter an HTTPS Google Scholar or ORCID profile URL.' })
+      return
+    }
+
     setIsSubmitting(true)
-    
-    // Simulate API submission
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      await api.applications.applyEditor({
+        title: formData.title,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        institution: formData.institution.trim(),
+        expertise: formData.expertise.trim(),
+        scholar_url: url,
+        cover_letter: cover,
+        website: '',
+      })
       setIsSuccess(true)
-    }, 1500)
+    } catch (err) {
+      const apiErr = toApiError(err)
+      const mapped = fieldErrorMap(apiErr, {
+        scholar_url: 'scholarUrl',
+        cover_letter: 'coverLetter',
+      })
+      if (Object.keys(mapped).length) setFieldErrors(mapped)
+      else setError(apiErr.message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isSuccess) {
@@ -78,7 +114,8 @@ export default function ApplyEditor() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+          <FormError message={error} />
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-1.5 md:col-span-1">
               <label className="text-sm font-semibold text-navy-900">Title</label>
@@ -116,21 +153,43 @@ export default function ApplyEditor() {
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-navy-900">Primary Institution / Affiliation</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <Building className="h-5 w-5 text-gray-400" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-navy-900">Email Address</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none text-sm font-medium text-navy-900 placeholder-gray-400"
+                  placeholder="jane.doe@university.edu"
+                />
               </div>
-              <input
-                type="text"
-                name="institution"
-                required
-                value={formData.institution}
-                onChange={handleChange}
-                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none text-sm font-medium text-navy-900 placeholder-gray-400"
-                placeholder="University or Research Center"
-              />
+              <FieldError message={fieldErrors.email} />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-navy-900">Primary Institution / Affiliation</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Building className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  name="institution"
+                  required
+                  value={formData.institution}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none text-sm font-medium text-navy-900 placeholder-gray-400"
+                  placeholder="University or Research Center"
+                />
+              </div>
+              <FieldError message={fieldErrors.institution} />
             </div>
           </div>
 
@@ -166,9 +225,10 @@ export default function ApplyEditor() {
                   value={formData.scholarUrl}
                   onChange={handleChange}
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none text-sm font-medium text-navy-900 placeholder-gray-400"
-                  placeholder="https://"
+                  placeholder="https://scholar.google.com/citations?user=..."
                 />
               </div>
+              <FieldError message={fieldErrors.scholarUrl} />
             </div>
           </div>
 
@@ -180,9 +240,10 @@ export default function ApplyEditor() {
               rows="4"
               value={formData.coverLetter}
               onChange={handleChange}
-              placeholder="Briefly describe your editorial experience and motivation to join us..."
+              placeholder="Briefly describe your editorial experience and motivation to join us (minimum 50 characters)..."
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none text-sm text-navy-900 resize-none"
             ></textarea>
+            <FieldError message={fieldErrors.coverLetter} />
           </div>
 
           <div className="pt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-4 border-t border-gray-100">

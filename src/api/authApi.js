@@ -2,6 +2,7 @@ import { http } from './http'
 
 // Public auth calls never send (or refresh) a bearer token.
 const pub = { skipAuth: true }
+const oauthCfg = { skipAuth: true, withCredentials: true }
 
 export const authApi = {
   register: (body) => http.post('/auth/register', body, pub).then((r) => r.data),
@@ -12,4 +13,8 @@ export const authApi = {
   resendVerification: () => http.post('/auth/resend-verification').then((r) => r.data),
   forgotPassword: (email) => http.post('/auth/forgot-password', { email }, pub).then((r) => r.data),
   resetPassword: (body) => http.post('/auth/reset-password', body, pub).then((r) => r.data),
+  oauthStart: (provider) =>
+    http.get(`/auth/oauth/${encodeURIComponent(provider)}/start`, oauthCfg).then((r) => r.data),
+  oauthCallback: (provider, body) =>
+    http.post(`/auth/oauth/${encodeURIComponent(provider)}`, body, oauthCfg).then((r) => r.data),
 }

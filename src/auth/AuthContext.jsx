@@ -72,6 +72,14 @@ export function AuthProvider({ children }) {
     [startSession],
   )
 
+  const completeOAuth = useCallback(
+    async (provider, body) => {
+      const tokens = await authApi.oauthCallback(provider, body)
+      return startSession(tokens, false)
+    },
+    [startSession],
+  )
+
   const logout = useCallback(async () => {
     const refreshToken = session.getRefreshToken()
     try {
@@ -96,10 +104,11 @@ export function AuthProvider({ children }) {
       isLoading: status === 'loading',
       login,
       register,
+      completeOAuth,
       logout,
       refreshUser,
     }),
-    [user, status, login, register, logout, refreshUser],
+    [user, status, login, register, completeOAuth, logout, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

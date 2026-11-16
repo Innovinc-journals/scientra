@@ -2,8 +2,8 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { MainLayout } from './layouts/MainLayout'
 import { ScrollToTop } from './components/common/ScrollToTop'
-import AuthorSubmit from './pages/author/AuthorSubmit'
-
+import { AuthorLayout } from './layouts/AuthorLayout'
+import { EditorLayout } from './layouts/EditorLayout'
 import { JournalLayout } from './layouts/JournalLayout'
 import { AdminLayout } from './layouts/AdminLayout'
 import { JournalPlaceholderPage } from './pages/JournalPlaceholderPage'
@@ -24,8 +24,13 @@ import ManuscriptFormatting from './pages/authors/ManuscriptFormatting'
 import ReviewGuidelines from './pages/authors/ReviewGuidelines'
 import SubmissionChecklist from './pages/authors/SubmissionChecklist'
 import News from './pages/News'
+import PolicyPage from './pages/PolicyPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import VerifyEmail from './pages/VerifyEmail'
+import OAuthCallback from './pages/OAuthCallback'
 import ApplyEditor from './pages/ApplyEditor'
 import Journals from './pages/Journals'
 import JournalDetails from './pages/JournalDetails'
@@ -33,23 +38,31 @@ import JournalArticles from './pages/JournalArticles'
 import ArticleDetails from './pages/ArticleDetails'
 import Editors from './pages/Editors'
 import NotFound from './pages/NotFound'
+
+import AuthorDashboard from './pages/author/AuthorDashboard'
+import AuthorSubmit from './pages/author/AuthorSubmit'
+import AuthorSubmissions from './pages/author/AuthorSubmissions'
+import AuthorManuscriptDetail from './pages/author/AuthorManuscriptDetail'
+import AuthorBookmarks from './pages/author/AuthorBookmarks'
+
+import EditorManuscripts from './pages/editor/EditorManuscripts'
+import EditorManuscriptDetail from './pages/editor/EditorManuscriptDetail'
+
+import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminApplications from './pages/admin/AdminApplications'
 import AdminEmployees from './pages/admin/AdminEmployees'
 import AdminManuscripts from './pages/admin/AdminManuscripts'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import VerifyEmail from './pages/VerifyEmail'
+import AdminManuscriptDetail from './pages/admin/AdminManuscriptDetail'
+import AdminProduction from './pages/admin/AdminProduction'
+import AdminInquiries from './pages/admin/AdminInquiries'
+import AdminApcWaivers from './pages/admin/AdminApcWaivers'
+import AdminSettings from './pages/admin/AdminSettings'
+import AdminCatalog from './pages/admin/AdminCatalog'
+
 import { ProtectedRoute } from './auth/ProtectedRoute'
-import { useAuth } from './auth/AuthContext'
-import { ROLES, roleHome } from './auth/roles'
+import { ROLES } from './auth/roles'
 
 const ADMIN_ROLES = [ROLES.STAFF, ROLES.SUPER_ADMIN]
-
-// /admin landing: send each role to the first screen it may use.
-function AdminIndex() {
-  const { user } = useAuth()
-  return <Navigate to={roleHome(user?.role)} replace />
-}
 
 function App() {
   return (
@@ -76,12 +89,16 @@ function App() {
             <Route path="submission-checklist" element={<SubmissionChecklist />} />
           </Route>
           <Route path="news" element={<News />} />
+          <Route path="policies/:slug" element={<PolicyPage />} />
           <Route path="submit" element={<AuthorSubmit />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="verify-email" element={<VerifyEmail />} />
+          <Route path="auth/oauth/:provider/callback" element={<OAuthCallback />} />
+          <Route path="auth/oauth/:provider" element={<OAuthCallback />} />
+          <Route path="oauth/callback" element={<OAuthCallback />} />
           <Route path="apply-editor" element={<ApplyEditor />} />
           <Route path="articles" element={<Navigate to="/journals" replace />} />
           <Route path="articles/:articleId" element={<ArticleDetails />} />
@@ -108,6 +125,36 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
 
+        {/* Author Workspace (/dashboard) */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute roles={[ROLES.AUTHOR, ROLES.EDITOR, ROLES.STAFF, ROLES.SUPER_ADMIN]}>
+              <AuthorLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AuthorDashboard />} />
+          <Route path="submit" element={<AuthorSubmit />} />
+          <Route path="submissions" element={<AuthorSubmissions />} />
+          <Route path="submissions/:manuscriptId" element={<AuthorManuscriptDetail />} />
+          <Route path="bookmarks" element={<AuthorBookmarks />} />
+        </Route>
+
+        {/* Editor Workspace (/editor) */}
+        <Route
+          path="/editor"
+          element={
+            <ProtectedRoute roles={[ROLES.EDITOR, ROLES.SUPER_ADMIN]}>
+              <EditorLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<EditorManuscripts />} />
+          <Route path="manuscripts/:manuscriptId" element={<EditorManuscriptDetail />} />
+        </Route>
+
+        {/* Staff & Super Admin Workspace (/admin) */}
         <Route
           path="/admin"
           element={
@@ -116,11 +163,51 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<AdminIndex />} />
-          <Route path="employees" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><AdminEmployees /></ProtectedRoute>} />
-          <Route path="applications" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><AdminApplications /></ProtectedRoute>} />
-          <Route path="manuscripts" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminManuscripts /></ProtectedRoute>} />
-          <Route path="settings" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><JournalPlaceholderPage title="Admin Settings" /></ProtectedRoute>} />
+          <Route index element={<AdminDashboard />} />
+          <Route path="manuscripts" element={<AdminManuscripts />} />
+          <Route path="manuscripts/:manuscriptId" element={<AdminManuscriptDetail />} />
+          <Route path="production" element={<AdminProduction />} />
+          <Route path="apc-waivers" element={<AdminApcWaivers />} />
+          <Route
+            path="employees"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <AdminEmployees />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="applications"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <AdminApplications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="inquiries"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <AdminInquiries />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="catalog"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <AdminCatalog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </>

@@ -36,35 +36,42 @@ export default function Home() {
   const [journals, setJournals] = useState([])
   const [articles, setArticles] = useState([])
   const [stats, setStats] = useState(null)
+  const [newsItems, setNewsItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeResourceTab, setActiveResourceTab] = useState('authors')
   const [selectedNews, setSelectedNews] = useState(null)
 
-  // Compile news dynamically from loaded journals
-  const allNews = journals.reduce((acc, journal) => {
-    if (journal.news) {
-      const journalNews = journal.news.map((item, idx) => ({
-        id: `${journal.id}-news-${idx}`,
-        title: item.title,
-        summary: item.summary,
-        image: item.image,
-        category: journal.category || 'General Science',
-        journalId: journal.id,
-        journalTitle: journal.title,
-        date: item.date || '13 Aug 2026'
-      }))
-      return [...acc, ...journalNews]
-    }
-    return acc
-  }, [])
+  // Prefer API news when returned; otherwise compile news from loaded journals
+  const allNews =
+    newsItems.length > 0
+      ? newsItems
+      : journals.reduce((acc, journal) => {
+          if (journal.news) {
+            const journalNews = journal.news.map((item, idx) => ({
+              id: `${journal.id}-news-${idx}`,
+              title: item.title,
+              summary: item.summary,
+              image: item.image,
+              category: journal.category || 'General Science',
+              journalId: journal.id,
+              journalTitle: journal.title,
+              date: item.date || '13 Aug 2026'
+            }))
+            return [...acc, ...journalNews]
+          }
+          return acc
+        }, [])
+
+  const fmtStat = (val, fallback) =>
+    typeof val === 'number' && val > 0 ? val.toLocaleString() : fallback
 
   const specificStats = [
-    { value: "15,000+", label: "authors" },
-    { value: "120+", label: "countries" },
-    { value: "5M+", label: "downloads" },
-    { value: "50,000+", label: "research Papers" },
-    { value: "2,500+", label: "editors" },
-    { value: "3,000+", label: "institutions" }
+    { value: fmtStat(stats?.authors, "15,000+"), label: "authors" },
+    { value: stats?.countries != null && stats.countries > 0 ? stats.countries.toLocaleString() : "120+", label: "countries" },
+    { value: fmtStat(stats?.downloads, "5M+"), label: "downloads" },
+    { value: fmtStat(stats?.papers, "50,000+"), label: "research Papers" },
+    { value: fmtStat(stats?.editors, "2,500+"), label: "editors" },
+    { value: fmtStat(stats?.institutions, "3,000+"), label: "institutions" }
   ]
 
   const dummyEditors = [
@@ -78,14 +85,18 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [journalsData, articlesData, statsData] = await Promise.all([
+        const [journalsData, articlesData, statsData, newsData] = await Promise.all([
           api.journals.getAll(),
           api.articles.getTrending(),
-          api.stats.get()
+          api.stats.get(),
+          api.news.getAll({ page_size: 12 }),
+          api.categories.getAll(),
+          api.articles.getMostViewed(),
         ])
         setJournals(journalsData)
         setArticles(articlesData)
         setStats(statsData)
+        setNewsItems(newsData || [])
       } catch (error) {
         console.error("Failed to fetch home data", error)
       } finally {

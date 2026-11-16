@@ -1,31 +1,27 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Calendar, ArrowRight, Tag, X, BookOpen, ExternalLink } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { JOURNALS } from '../utils/data'
+import { api } from '../api/apiClient'
 
 export default function News() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [selectedNews, setSelectedNews] = useState(null)
   const [visibleCount, setVisibleCount] = useState(6)
+  const [allNews, setAllNews] = useState([])
 
-  // Dynamically compile all news items from all journals
-  const allNews = JOURNALS.reduce((acc, journal) => {
-    if (journal.news) {
-      const journalNews = journal.news.map((item, idx) => ({
-        id: `${journal.id}-news-${idx}`,
-        title: item.title,
-        summary: item.summary,
-        image: item.image,
-        category: journal.category || 'General Science',
-        journalId: journal.id,
-        journalTitle: journal.title,
-        date: item.date || '13 Aug 2026'
-      }))
-      return [...acc, ...journalNews]
+  useEffect(() => {
+    let alive = true
+    api.news
+      .getAll({ page_size: 100 })
+      .then((items) => {
+        if (alive) setAllNews(items)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
     }
-    return acc
   }, [])
 
   // Dynamically compile unique categories

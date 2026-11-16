@@ -1,202 +1,311 @@
-import React, { useState } from 'react'
-import { Search, Filter, FileText, Download, CheckCircle, XCircle, Clock, Eye, MoreVertical } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Search, FileText, Download, RefreshCw, UserPlus } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { motion } from 'framer-motion'
+import { FormError, FormNotice } from '../../components/auth/AuthCard'
+import { api } from '../../api/apiClient'
+import {
+  getStatusMeta,
+  formatIsoDateTime,
+  MANUSCRIPT_STATUS,
+} from '../../utils/manuscriptStatus'
+import { toApiError } from '../../api/errors'
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: MANUSCRIPT_STATUS.SUBMITTED, label: 'Awaiting screening (SUBMITTED)' },
+  { value: MANUSCRIPT_STATUS.CORRECTIONS_REQUESTED, label: 'Screening corrections requested' },
+  { value: MANUSCRIPT_STATUS.ASSIGNED_TO_EDITOR, label: 'With editor (ASSIGNED_TO_EDITOR)' },
+  { value: MANUSCRIPT_STATUS.REVISIONS_REQUESTED, label: 'Editor revisions requested' },
+  { value: MANUSCRIPT_STATUS.ACCEPTED, label: 'Accepted, in production' },
+  { value: MANUSCRIPT_STATUS.PUBLISHED, label: 'Published' },
+  { value: MANUSCRIPT_STATUS.REJECTED, label: 'Rejected' },
+]
 
 export default function AdminManuscripts() {
-  const [activeTab, setActiveTab] = useState('All')
+  const [assignment, setAssignment] = useState('unassigned') // unassigned | mine | all
+  const [statusFilter, setStatusFilter] = useState('SUBMITTED')
+  const [stageFilter, setStageFilter] = useState('SCREENING') // SCREENING | PRODUCTION
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 20
 
-  const mockManuscripts = [
-    {
-      id: 'MAN-2023-089',
-      title: 'Targeted Therapy in Advanced Non-Small Cell Lung Cancer: A Review',
-      authors: 'Dr. Jane Smith, Prof. Robert Doe',
-      journal: 'Journal of Cancer Genetics',
-      status: 'New',
-      submittedAt: '2 hours ago',
-      type: 'Review Article'
-    },
-    {
-      id: 'MAN-2023-088',
-      title: 'Epigenetic Modulators in Pediatric Leukemia',
-      authors: 'Dr. Emily Chen, Dr. Michael Wong',
-      journal: 'Pediatric Oncology Review',
-      status: 'In Review',
-      submittedAt: '2 days ago',
-      type: 'Original Research'
-    },
-    {
-      id: 'MAN-2023-085',
-      title: 'Radiotherapy Sensitization using Gold Nanoparticles',
-      authors: 'Prof. Alan Turing, Dr. Marie Curie',
-      journal: 'Clinical Oncology Reports',
-      status: 'Accepted',
-      submittedAt: '1 week ago',
-      type: 'Clinical Trial'
-    },
-    {
-      id: 'MAN-2023-081',
-      title: 'Early Detection of Pancreatic Cancer Biomarkers',
-      authors: 'Dr. Lisa Ray',
-      journal: 'Journal of Cancer Genetics',
-      status: 'Rejected',
-      submittedAt: '2 weeks ago',
-      type: 'Short Communication'
+  const [items, setItems] = useState([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [claimingId, setClaimingId] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.admin.listManuscripts({
+        status: statusFilter || undefined,
+        q: searchTerm.trim() || undefined,
+        employee_assignment: assignment,
+        employee_stage: stageFilter,
+        page,
+        page_size: pageSize,
+      })
+      setItems(res.items || [])
+      setTotal(res.total ?? (res.items || []).length)
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }, [assignment, statusFilter, stageFilter, searchTerm, page])
 
-  const getStatusBadge = (status) => {
-    switch(status) {
-      case 'New':
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-200"><Clock className="w-3 h-3 mr-1" /> New Submission</Badge>
-      case 'In Review':
-        return <Badge className="bg-amber-50 text-amber-700 border-amber-200"><Eye className="w-3 h-3 mr-1" /> In Review</Badge>
-      case 'Accepted':
-        return <Badge className="bg-green-50 text-green-700 border-green-200"><CheckCircle className="w-3 h-3 mr-1" /> Accepted</Badge>
-      case 'Rejected':
-        return <Badge className="bg-red-50 text-red-700 border-red-200"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>
-      default:
-        return <Badge>{status}</Badge>
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const handleClaim = async (manuscriptId) => {
+    setClaimingId(manuscriptId)
+    setError('')
+    setNotice('')
+    try {
+      await api.admin.claimManuscript(manuscriptId)
+      setNotice(`Manuscript ${manuscriptId} claimed into your screening queue.`)
+      await load()
+    } catch (err) {
+      const apiErr = toApiError(err)
+      if (apiErr.status === 409) {
+        setError('Ownership changed — another staff member claimed this manuscript. Queue refreshed.')
+        await load()
+      } else {
+        setError(apiErr.message)
+      }
+    } finally {
+      setClaimingId(null)
     }
   }
 
-  const filteredManuscripts = mockManuscripts.filter(m => {
-    const matchesSearch = m.title.toLowerCase().includes(searchTerm.toLowerCase()) || m.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTab = activeTab === 'All' || m.status === activeTab
-    return matchesSearch && matchesTab
-  })
+  const handleDownload = async (manuscriptId, version) => {
+    setError('')
+    try {
+      await api.admin.downloadManuscript(manuscriptId, version)
+    } catch (err) {
+      setError(toApiError(err).message)
+    }
+  }
 
-  const tabs = ['All', 'New', 'In Review', 'Accepted', 'Rejected']
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-navy-950">Manuscript Processing</h2>
-          <p className="text-gray-500 text-sm mt-1">Review, assign, and manage submitted manuscripts from authors.</p>
+          <h2 className="text-2xl font-bold text-navy-950">Manuscripts &amp; Screening Queue</h2>
+          <p className="text-gray-500 text-sm mt-1">
+            Claim new submissions, perform screening checks, and manage editorial workflow.
+          </p>
         </div>
+        <Button type="button" variant="outline" onClick={load} disabled={loading} className="gap-2">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Queue
+        </Button>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'New Submissions', value: '12', color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'In Review', value: '34', color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Accepted (30d)', value: '8', color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Avg Time to Decision', value: '14d', color: 'text-purple-600', bg: 'bg-purple-50' }
-        ].map(stat => (
-          <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <div className={`w-10 h-10 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center mb-3 font-bold text-lg`}>
-              {stat.value}
-            </div>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{stat.label}</h4>
-          </div>
-        ))}
-      </div>
+      <FormError message={error} />
+      <FormNotice message={notice} />
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-        {/* Toolbar */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Assignment Tabs + Filters */}
         <div className="p-6 border-b border-gray-200 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between gap-4">
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-gray-50 p-1 rounded-xl">
-              {tabs.map(tab => (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              {[
+                { key: 'unassigned', label: 'Unclaimed Queue' },
+                { key: 'mine', label: 'My Queue' },
+                { key: 'all', label: 'All Manuscripts' },
+              ].map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setAssignment(tab.key)
+                    if (tab.key === 'unassigned') setStatusFilter(MANUSCRIPT_STATUS.SUBMITTED)
+                    setPage(1)
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    activeTab === tab 
-                      ? 'bg-white text-navy-950 shadow-sm' 
-                      : 'text-gray-500 hover:text-navy-900 hover:bg-gray-100'
+                    assignment === tab.key
+                      ? 'bg-white text-navy-950 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search ID or Title..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 outline-none text-sm transition-colors"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={stageFilter}
+                onChange={(e) => {
+                  setStageFilter(e.target.value)
+                  setPage(1)
+                }}
+                className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-semibold text-navy-900 outline-none"
+              >
+                <option value="SCREENING">Stage: Screening</option>
+                <option value="PRODUCTION">Stage: Production</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
+                  setPage(1)
+                }}
+                className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-semibold text-navy-900 outline-none"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div className="relative w-full sm:w-96">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search by title or tracking ID..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setPage(1)
+              }}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 outline-none text-sm font-medium transition-colors"
+            />
           </div>
         </div>
 
-        {/* List */}
-        <div className="divide-y divide-gray-100 bg-gray-50/30">
-          {filteredManuscripts.map((manuscript, index) => (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.05 }}
-              key={manuscript.id} 
-              className="p-6 hover:bg-white transition-colors group flex flex-col lg:flex-row lg:items-center gap-6"
-            >
-              
-              <div className="flex-grow space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                    {manuscript.id}
-                  </span>
-                  {getStatusBadge(manuscript.status)}
-                  <span className="text-xs text-gray-500 font-medium">{manuscript.submittedAt}</span>
-                </div>
-                
-                <h3 className="text-lg font-bold text-navy-950 leading-snug group-hover:text-primary-700 transition-colors cursor-pointer">
-                  {manuscript.title}
-                </h3>
-                
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <FileText className="w-4 h-4 text-gray-400" /> {manuscript.type}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                  <span>{manuscript.journal}</span>
-                  <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                  <span className="italic">{manuscript.authors}</span>
-                </div>
-              </div>
-
-              <div className="shrink-0 flex items-center gap-3 lg:border-l lg:border-gray-100 lg:pl-6">
-                <Button variant="outline" className="h-9 px-4 gap-2 text-primary-700 border-primary-200 hover:bg-primary-50">
-                  <Download className="w-4 h-4" /> PDF
-                </Button>
-                {manuscript.status === 'New' && (
-                  <Button className="h-9 px-4 bg-navy-950 hover:bg-navy-900">
-                    Assign Reviewers
-                  </Button>
-                )}
-                <button className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </div>
-
-            </motion.div>
-          ))}
-
-          {filteredManuscripts.length === 0 && (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-sm">
-                <FileText className="w-8 h-8 text-gray-300" />
-              </div>
-              <h3 className="text-lg font-bold text-navy-950 mb-1">No manuscripts found</h3>
-              <p className="text-gray-500 text-sm">No submissions match the current filters.</p>
+        {/* Table */}
+        {loading ? (
+          <div className="p-16 flex justify-center">
+            <div className="w-8 h-8 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="p-16 text-center space-y-2 text-gray-500">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-base font-medium text-gray-900">No manuscripts in this view</p>
+            <p className="text-xs">Try switching between Unclaimed, My Queue, and All Manuscripts or adjusting filters.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="py-4 px-6 font-semibold">Manuscript Details</th>
+                    <th className="py-4 px-6 font-semibold">Journal</th>
+                    <th className="py-4 px-6 font-semibold">Versions</th>
+                    <th className="py-4 px-6 font-semibold">Status</th>
+                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-sm">
+                  {items.map((m) => {
+                    const meta = getStatusMeta(m.status)
+                    const canClaim = m.status === MANUSCRIPT_STATUS.SUBMITTED && !m.screening_employee_id
+                    return (
+                      <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="py-4 px-6 max-w-md">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-bold text-primary-600">{m.id}</span>
+                            {m.article_type && (
+                              <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                                {m.article_type}
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-bold text-navy-950 line-clamp-2 mb-1">{m.title}</div>
+                          <div className="text-xs text-gray-400">
+                            Updated {formatIsoDateTime(m.updated_at || m.created_at)}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 font-medium text-gray-700">{m.journal_title || m.journal_id}</td>
+                        <td className="py-4 px-6 text-xs text-gray-600 space-y-1">
+                          <div>Source v{m.current_version ?? 1}</div>
+                          {m.proof_version > 0 && <div>Proof v{m.proof_version}</div>}
+                        </td>
+                        <td className="py-4 px-6">
+                          <Badge className={meta.badgeClass}>{meta.label}</Badge>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {canClaim && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={claimingId === m.id}
+                                onClick={() => handleClaim(m.id)}
+                                className="gap-1.5"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                                {claimingId === m.id ? 'Claiming...' : 'Claim'}
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownload(m.id, m.current_version)}
+                              title="Download Current Source"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            <Link to={`/admin/manuscripts/${encodeURIComponent(m.id)}`}>
+                              <Button variant="outline" size="sm">
+                                Open
+                              </Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                <span>
+                  Page {page} of {totalPages} ({total} total)
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

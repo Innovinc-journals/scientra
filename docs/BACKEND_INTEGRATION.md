@@ -158,13 +158,13 @@ Show buttons from role + status + ownership + version; backend stays authoritati
 |---|---|---|
 | 0 | **DONE (develop).** `.env.example` (`VITE_API_BASE_URL`), `http.js`, error normaliser, session store, `AuthContext`, `ProtectedRoute`, role routing, 401 single-flight refresh | `src/api/*`, `src/auth/*`, `main.jsx`, `App.jsx` |
 | 1 | **DONE (develop).** Login, Register, Forgot/Reset password, Verify email (+ resend, cooldown), logout, session restore, admin route guards by role | `Login.jsx`, `Register.jsx`, `ForgotPassword.jsx`, `ResetPassword.jsx`, `VerifyEmail.jsx`, `AdminLayout.jsx` |
-| 2 | Public read APIs behind `apiClient.js` with **response adapters** so existing UI props stay unchanged; News, policies, contact, apply-editor, bookmarks, view count, downloads | `apiClient.js`, `News.jsx`, `ApplyEditor.jsx`, contact page |
-| 3 | Author: submit (replaces Drive), my-submissions, detail, revision upload, proof approve, APC waiver | `AuthorSubmit.jsx` + new author pages |
-| 4 | Staff: queue, claim, detail, source download, screening checks, screening decision, assign editor | `AdminManuscripts.jsx` + detail |
-| 5 | Editor: assigned list, detail, version download, decision | new pages |
-| 6 | Production: proof upload, tasks, DOI status, publish (pending state) | admin pages |
-| 7 | Super Admin: dashboard, employees, applications, inquiries, waivers, settings, policies, journals/categories | `AdminEmployees.jsx`, `AdminApplications.jsx`, others |
-| 8 | Cleanup: remove Drive code and hardcoded Apps Script URL, remove static `data.js` fallback, optional OAuth, docs + release checklist | many |
+| 2 | **DONE (develop).** Public read APIs behind `apiClient.js` with response adapters; News, policies, contact, apply-editor, bookmarks, view count, downloads | `apiClient.js`, `download.js`, `News.jsx`, `ApplyEditor.jsx`, `Contact.jsx`, `ArticleDetails.jsx`, `Editors.jsx`, `PolicyPage.jsx` |
+| 3 | **DONE (develop).** Author: submit (replaces Drive), my-submissions, detail, revision upload, proof approve, APC waiver, bookmarks | `AuthorLayout.jsx`, `AuthorDashboard.jsx`, `AuthorSubmit.jsx`, `AuthorSubmissions.jsx`, `AuthorManuscriptDetail.jsx`, `AuthorBookmarks.jsx` |
+| 4 | **DONE (develop).** Staff: queue, claim, detail, source download, screening checks, screening decision, assign editor | `AdminManuscripts.jsx`, `AdminManuscriptDetail.jsx` |
+| 5 | **DONE (develop).** Editor: assigned list, detail, version download, decision | `EditorLayout.jsx`, `EditorManuscripts.jsx`, `EditorManuscriptDetail.jsx` |
+| 6 | **DONE (develop).** Production: proof upload, tasks, DOI status, publish (with live DOI release gate) | `AdminProduction.jsx`, `AdminManuscriptDetail.jsx` |
+| 7 | **DONE (develop).** Super Admin: dashboard, employees, applications, inquiries, waivers, settings, policies, journals/categories | `AdminDashboard.jsx`, `AdminEmployees.jsx`, `AdminApplications.jsx`, `AdminInquiries.jsx`, `AdminApcWaivers.jsx`, `AdminSettings.jsx`, `AdminCatalog.jsx` |
+| 8 | **DONE (develop).** Removed Google Drive upload & hardcoded Apps Script URL, wired OAuth start/callback, updated docs | `AuthorSubmit.jsx`, `OAuthCallback.jsx`, `Login.jsx`, `Navbar.jsx` |
 
 Admin status labels in the current mock UI (New / In Review / Accepted / Rejected) must be mapped from real backend states (`SUBMITTED`, `ASSIGNED_TO_EDITOR`, `ACCEPTED`, `REJECTED`, ...), not hardcoded.
 

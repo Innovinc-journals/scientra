@@ -1,37 +1,115 @@
-import React, { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  Download, Share2, Bookmark, Eye, Quote, FileText,
+  Download, Share2, Bookmark, Eye, FileText,
   ChevronRight, Mail, Globe, BookOpen, Users, BarChart2, X
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { api } from '../api/apiClient'
-
-const SECTION_TABS = ['Abstract', 'Introduction', 'Methods', 'Results', 'Conclusion', 'References']
+import { useAuth } from '../auth/AuthContext'
+import { toApiError } from '../api/errors'
 
 export default function ArticleDetails() {
   const { articleId } = useParams()
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
   const [article, setArticle] = useState(null)
   const [relatedArticles, setRelatedArticles] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('Abstract')
   const [isAffiliationsModalOpen, setIsAffiliationsModalOpen] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [bookmarkBusy, setBookmarkBusy] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
+  const viewedRef = useRef(null)
 
   useEffect(() => {
+    let alive = true
     const fetchArticle = async () => {
       try {
-        const data = await api.articles.getById(articleId)
+        const [data, related] = await Promise.all([
+          api.articles.getById(articleId),
+          api.articles.getRelated(articleId),
+        ])
+        if (!alive) return
         setArticle(data)
-        const journalArticles = await api.articles.getByJournal(data.journalId)
-        setRelatedArticles(journalArticles.filter(a => a.id !== data.id).slice(0, 3))
+        setRelatedArticles(related.slice(0, 3))
+
+        if (viewedRef.current !== articleId) {
+          viewedRef.current = articleId
+          api.articles.recordView(articleId).then((res) => {
+            if (alive && res?.counted) {
+              setArticle((prev) => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev))
+            }
+          })
+        }
       } catch (error) {
         console.error('Failed to fetch article', error)
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     }
     fetchArticle()
+    return () => {
+      alive = false
+    }
   }, [articleId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !articleId) {
+      setIsBookmarked(false)
+      return undefined
+    }
+    let alive = true
+    api.bookmarks
+      .getAll({ page_size: 100 })
+      .then((res) => {
+        if (!alive) return
+        setIsBookmarked(res.items.some((item) => String(item.id) === String(articleId)))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [isAuthenticated, articleId])
+
+  const handleDownload = async () => {
+    if (!article || downloading) return
+    setDownloading(true)
+    setActionMessage('')
+    try {
+      await api.articles.download(article.id, `${article.id}.pdf`)
+    } catch (err) {
+      setActionMessage(toApiError(err).message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const handleToggleBookmark = async () => {
+    if (!article) return
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: `/articles/${article.id}` } } })
+      return
+    }
+    if (bookmarkBusy) return
+    setBookmarkBusy(true)
+    setActionMessage('')
+    try {
+      if (isBookmarked) {
+        await api.bookmarks.remove(article.id)
+        setIsBookmarked(false)
+      } else {
+        await api.bookmarks.add(article.id)
+        setIsBookmarked(true)
+      }
+    } catch (err) {
+      setActionMessage(toApiError(err).message)
+    } finally {
+      setBookmarkBusy(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -165,13 +243,25 @@ export default function ArticleDetails() {
 
           {/* ─── Action Bar ─── */}
           <div className="flex flex-wrap items-center gap-3 py-2">
-            <button className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            >
               <Download className="w-4 h-4" />
-              Download PDF
+              {downloading ? 'Preparing PDF...' : 'Download PDF'}
             </button>
+
+            {actionMessage && (
+              <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                {actionMessage}
+              </span>
+            )}
 
             <div className="flex items-center gap-1 ml-auto">
               <button
+                type="button"
                 onClick={() => navigator.clipboard.writeText(window.location.href)}
                 className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors text-gray-500 hover:text-primary-600"
                 title="Share"
@@ -179,10 +269,17 @@ export default function ArticleDetails() {
                 <Share2 className="w-4 h-4" />
               </button>
               <button
-                className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors text-gray-500 hover:text-primary-600"
-                title="Save"
+                type="button"
+                onClick={handleToggleBookmark}
+                disabled={bookmarkBusy}
+                className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-colors ${
+                  isBookmarked
+                    ? 'border-primary-500 bg-primary-50 text-primary-600'
+                    : 'border-gray-200 hover:border-primary-400 hover:bg-primary-50 text-gray-500 hover:text-primary-600'
+                }`}
+                title={isBookmarked ? 'Remove bookmark' : 'Save bookmark'}
               >
-                <Bookmark className="w-4 h-4" />
+                <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
               </button>
             </div>
           </div>

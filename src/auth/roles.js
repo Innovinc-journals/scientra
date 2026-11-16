@@ -5,21 +5,22 @@ export const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
 }
 
-// Where each role lands after sign-in. The actual role (from /auth/me) is the access rule;
-// the backend's `redirect_hint` is ignored.
-// NOTE: AUTHOR and EDITOR point to '/' until their workspaces are built (author dashboard in
-// phase 3, editor workspace in phase 5); update here when those routes exist.
+// Where each role lands after sign-in. The actual role (from /auth/me) is the access rule:
+// AUTHOR -> their submissions (/dashboard)
+// EDITOR -> assigned reviews (/editor)
+// STAFF  -> screening/production (/admin/manuscripts)
+// SUPER_ADMIN -> administrative tools (/admin)
 export function roleHome(role) {
   switch (role) {
     case ROLES.SUPER_ADMIN:
-      return '/admin/employees'
+      return '/admin'
     case ROLES.STAFF:
       return '/admin/manuscripts'
     case ROLES.EDITOR:
-      return '/'
+      return '/editor'
     case ROLES.AUTHOR:
     default:
-      return '/'
+      return '/dashboard'
   }
 }
 
