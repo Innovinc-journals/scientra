@@ -24,6 +24,7 @@ export default function AdminSettings() {
   const [notice, setNotice] = useState('')
 
   // Policy Editor state
+  const [existingPolicySlugs, setExistingPolicySlugs] = useState(null)
   const [policySlug, setPolicySlug] = useState('editorial-policy')
   const [policyTitle, setPolicyTitle] = useState('Editorial Policy')
   const [policyMarkdown, setPolicyMarkdown] = useState('')
@@ -31,21 +32,26 @@ export default function AdminSettings() {
 
   useEffect(() => {
     let alive = true
-    api.admin
-      .getSettings()
-      .then((data) => {
-        if (!alive || !data || typeof data !== 'object') return
-        if (data.site_metadata && typeof data.site_metadata === 'object') {
-          setSiteMetadata((prev) => ({ ...prev, ...data.site_metadata }))
+    Promise.all([api.admin.getSettings(), api.policies.getAll({ page_size: 100 })])
+      .then(([data, policiesList]) => {
+        if (!alive) return
+        if (data && typeof data === 'object') {
+          if (data.site_metadata && typeof data.site_metadata === 'object') {
+            setSiteMetadata((prev) => ({ ...prev, ...data.site_metadata }))
+          }
+          if (data.contact_directory && typeof data.contact_directory === 'object') {
+            setContactDirectory((prev) => ({ ...prev, ...data.contact_directory }))
+          }
+          if (data.publishing_information && typeof data.publishing_information === 'object') {
+            setPublishingInfo((prev) => ({ ...prev, ...data.publishing_information }))
+          }
         }
-        if (data.contact_directory && typeof data.contact_directory === 'object') {
-          setContactDirectory((prev) => ({ ...prev, ...data.contact_directory }))
-        }
-        if (data.publishing_information && typeof data.publishing_information === 'object') {
-          setPublishingInfo((prev) => ({ ...prev, ...data.publishing_information }))
-        }
+        const slugs = Array.isArray(policiesList) ? policiesList.map((p) => p.slug).filter(Boolean) : []
+        setExistingPolicySlugs(slugs)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (alive) setExistingPolicySlugs([])
+      })
       .finally(() => {
         if (alive) setLoading(false)
       })
@@ -55,16 +61,23 @@ export default function AdminSettings() {
   }, [])
 
   useEffect(() => {
+    if (existingPolicySlugs === null) return undefined
+    const defaultTitle = POLICY_SLUGS.find((p) => p.slug === policySlug)?.label || policySlug
+    if (!existingPolicySlugs.includes(policySlug)) {
+      setPolicyTitle(defaultTitle)
+      setPolicyMarkdown('')
+      return undefined
+    }
     let alive = true
     api.policies
       .getBySlug(policySlug)
       .then((data) => {
         if (!alive) return
         if (data) {
-          setPolicyTitle(data.title || POLICY_SLUGS.find((p) => p.slug === policySlug)?.label || policySlug)
+          setPolicyTitle(data.title || defaultTitle)
           setPolicyMarkdown(data.content_markdown || data.content || '')
         } else {
-          setPolicyTitle(POLICY_SLUGS.find((p) => p.slug === policySlug)?.label || policySlug)
+          setPolicyTitle(defaultTitle)
           setPolicyMarkdown('')
         }
       })
@@ -72,7 +85,7 @@ export default function AdminSettings() {
     return () => {
       alive = false
     }
-  }, [policySlug])
+  }, [policySlug, existingPolicySlugs])
 
   const handleSaveSettings = async (e) => {
     e.preventDefault()
@@ -107,6 +120,9 @@ export default function AdminSettings() {
         title: policyTitle.trim(),
         content_markdown: policyMarkdown,
       })
+      setExistingPolicySlugs((prev) =>
+        Array.isArray(prev) && !prev.includes(policySlug) ? [...prev, policySlug] : prev,
+      )
       setNotice(`Saved policy "${policyTitle.trim()}" (/policies/${policySlug}).`)
     } catch (err) {
       setError(toApiError(err).message)

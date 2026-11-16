@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/apiClient'
 import { useAuth } from '../../auth/AuthContext'
+import { ROLES, roleHome } from '../../auth/roles'
 import { toApiError } from '../../api/errors'
 
 const ARTICLE_TYPES = [
@@ -30,9 +31,10 @@ export default function AuthorSubmit() {
   const { journalId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth()
 
   const [journals, setJournals] = useState([])
+  const [noBackendJournals, setNoBackendJournals] = useState(false)
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -84,11 +86,21 @@ export default function AuthorSubmit() {
   useEffect(() => {
     let alive = true
     api.journals
-      .getAll({ page_size: 100 })
-      .then((list) => {
-        if (alive) setJournals(list || [])
+      .list({ page_size: 100 })
+      .then((res) => {
+        if (!alive) return
+        const items = res.items || []
+        setJournals(items)
+        setNoBackendJournals(items.length === 0)
       })
-      .catch(() => {})
+      .catch(() => {
+        api.journals
+          .getAll({ page_size: 100 })
+          .then((list) => {
+            if (alive) setJournals(list || [])
+          })
+          .catch(() => {})
+      })
     return () => {
       alive = false
     }
@@ -266,9 +278,9 @@ export default function AuthorSubmit() {
           <div className="w-14 h-14 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center mx-auto">
             <Lock className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-navy-950">Sign in to Submit Your Manuscript</h2>
+          <h2 className="text-2xl font-bold text-navy-950">Please Login Before Submitting Your Manuscript</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Manuscript submissions are tracked under your verified Scientra Author account so you can follow screening, peer review, revisions, and proofs.
+            You must sign in with a verified Scientra Author account before submitting a manuscript so you can track screening, peer review, revisions, and proofs.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <Link to="/login" state={{ from: location }}>
@@ -285,6 +297,40 @@ export default function AuthorSubmit() {
     )
   }
 
+  if (user?.role && user.role !== ROLES.AUTHOR) {
+    return (
+      <div className="max-w-xl mx-auto py-16 px-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center space-y-5">
+          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h2 className="text-2xl font-bold text-navy-950">Author Account Required</h2>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Only verified <strong>AUTHOR</strong> accounts can submit manuscripts. You are currently signed in as{' '}
+            <strong>{user.role}</strong> ({user.email}).
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link to={roleHome(user.role)}>
+              <Button variant="outline" className="w-full sm:w-auto px-6 h-11 rounded-xl">
+                Go to {user.role} Workspace
+              </Button>
+            </Link>
+            <Button
+              type="button"
+              onClick={async () => {
+                await logout()
+                navigate('/login', { state: { from: location } })
+              }}
+              className="w-full sm:w-auto px-6 h-11 rounded-xl"
+            >
+              Sign Out &amp; Login as Author
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const emailUnverified = user?.email_verified === false
 
   return (
@@ -293,6 +339,15 @@ export default function AuthorSubmit() {
         <h2 className="text-2xl font-bold text-navy-950">Submit New Manuscript</h2>
         <p className="text-gray-500 text-sm mt-1">Upload your research for screening and peer review.</p>
       </div>
+
+      {noBackendJournals && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-sm text-amber-800">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>
+            No active journals are registered in the backend database yet. A Super Admin must create a category and journal in Admin → Catalog before manuscripts can be submitted.
+          </span>
+        </div>
+      )}
 
       {emailUnverified && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
