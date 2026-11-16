@@ -5,7 +5,7 @@
 - **Frontend:** React 19 + Vite on cPanel, `https://scientrajournals.org`.
 - **Local dev API:** `http://127.0.0.1:8000` (local backend + test data).
 - **UI is frozen:** only logic changes. Any unavoidable UI addition is listed under "Decisions" and needs approval first.
-- **Source of truth:** the backend document (sections 1-4.2 received) + live `/openapi.json` (81 operations, fetched 2026-11-16). Sections after 4.2 of the document are still awaited; endpoints marked **(schema only)** are known from OpenAPI but not yet from the document.
+- **Source of truth:** the full backend handoff document (sections 1-6 received) + live `/openapi.json` (81 operations, fetched 2026-11-16). Related backend docs not yet seen: `SCIENTRA_SWAGGER_MANUAL_TESTING.md`, `EMPLOYEE_ASSIGNMENTS.md`, `IMPLEMENTATION_STATUS.md`, `PRODUCTION_EMAIL.md`. Ask for them if a detail is unclear.
 
 ## 1. Current state (before integration)
 
@@ -75,9 +75,13 @@ Password rule: 8-128 chars, upper-case, digit, special; must match confirm.
 | Submit | `POST /manuscripts/submit` multipart: journal_id, title (5-500), abstract (20-100000), article_type (default `ORIGINAL RESEARCH`), co_authors (JSON string, 1-100), file (PDF/DOC/DOCX, <=10 MiB). Needs verified email |
 | Dashboard | `GET /manuscripts/my-submissions` |
 | Detail | `GET /manuscripts/{id}` (versions[kind, version_number], remarks, status_history, production_tasks, proof_version, approved_proof_version) |
-| Revision (schema only) | `POST /manuscripts/{id}/revisions` multipart: author_response (10+), file |
-| Proof (schema only) | `GET /manuscripts/{id}/proof`, `POST /manuscripts/{id}/approve-proof` {proof_version} |
-| APC waiver (schema only) | `POST /manuscripts/{id}/apc-waiver` {reason 10+} |
+| Revision | `POST /manuscripts/{id}/revisions` multipart: author_response (10-10,000), file. Only when status is CORRECTIONS_REQUESTED or REVISIONS_REQUESTED. 201 creates next source version. Screening corrections return to SUBMITTED; editor revisions return to ASSIGNED_TO_EDITOR (same editor) |
+| Read decision remarks | `GET /manuscripts/{id}` (remarks, status_history) |
+| Proof review | `GET /manuscripts/{id}/proof` (latest proof; download rule applies) |
+| Approve proof | `POST /manuscripts/{id}/approve-proof` {proof_version} -> `{proof_version, approved:true}`. Send the exact number reviewed. 409 = reload and ask to review again |
+| APC waiver | `POST /manuscripts/{id}/apc-waiver` {reason 10+}, only for an ACCEPTED manuscript |
+
+Note: there is **no author endpoint to download their own source versions**. Do not build one. Source and proof lists stay separate in the UI.
 
 co_authors item: `{first_name,last_name,email,affiliation_name,orcid_id,is_corresponding}`. The signed-in author's email must be included, exactly one corresponding, unique emails, order = array order.
 
@@ -93,16 +97,60 @@ co_authors item: `{first_name,last_name,email,affiliation_name,orcid_id,is_corre
 | Screening decision | `POST /admin/manuscripts/{id}/screening-decision` {outcome PASS|REQUEST_CORRECTIONS|REJECT, editor_id (for PASS), message (10+ unless PASS)} -> `ASSIGNED_TO_EDITOR` |
 | Assign editor | `POST /admin/manuscripts/{id}/assign-editor` {editor_id, note} |
 
-### Editor (schema only; document section pending)
-`GET /editor/manuscripts`, `GET /editor/manuscripts/{id}`, `GET /editor/manuscripts/{id}/versions/{n}/download`, `PATCH /editor/manuscripts/{id}/decision` {decision REVISIONS_REQUESTED|ACCEPTED|REJECTED, remarks 10+}.
+### Editor (document 4.3)
+| Step | Endpoint |
+|---|---|
+| Queue (scoped to assigned editor) | `GET /editor/manuscripts` |
+| Detail | `GET /editor/manuscripts/{id}` |
+| Compare source versions | `GET /editor/manuscripts/{id}/versions/{n}/download` (no server-side diff; compare client-side by opening two versions) |
+| Decision | `PATCH /editor/manuscripts/{id}/decision` {decision REVISIONS_REQUESTED\|ACCEPTED\|REJECTED, remarks 10-10,000} |
+| Super Admin override | `PATCH /admin/manuscripts/{id}/decision` (same body) |
 
-### Production / publish (schema only; document section pending)
-`POST /admin/manuscripts/{id}/proof` (multipart file), `PATCH /admin/manuscripts/{id}/production-tasks/{task}` {status, notes}, `GET /admin/production?employee_assignment`, `GET /admin/manuscripts/{id}/doi-status`, `POST .../register-doi`, `POST .../publish`, `PATCH /admin/manuscripts/{id}/decision`.
-Publish button: show "Live DOI registration pending" until Crossref goes live; test success only against a sandbox.
+On ACCEPTED the current screening employee becomes production owner automatically. SUPER_ADMIN may change it with `assign-employee` stage PRODUCTION. If no eligible owner exists, the record shows in the unassigned production queue for SUPER_ADMIN.
 
-### Super Admin / governance (schema only; document section pending)
-`GET /admin/dashboard`; employees `GET/POST /admin/employees`, `PATCH/DELETE /admin/employees/{id}` (role STAFF|EDITOR|SUPER_ADMIN, status ACTIVE|INACTIVE); applications `GET /admin/applications?status`, `GET /admin/applications/{id}`, `POST /admin/applications/{id}/{decision}`; `GET/PATCH /admin/inquiries`; `GET /admin/apc-waivers`, `POST /admin/apc-waivers/{id}/{decision}`; `GET/PUT /admin/settings`; `PUT /admin/policies/{slug}`; `POST /admin/journals`, `POST /admin/categories`.
+### Production, proof, DOI, publish (document 4.4)
+| Step | Endpoint |
+|---|---|
+| Production list | `GET /admin/production?employee_assignment=mine\|unassigned` (SUPER_ADMIN also sees all) |
+| Detail | `GET /admin/manuscripts/{id}` |
+| Upload proof | `POST /admin/manuscripts/{id}/proof` multipart `file` only; **PDF required** even if the author sent DOCX. 201 `{proof_version}`. Clears author approval and resets PROOFREADING and FORMATTING_CHECK. Reload tasks and approval state after upload. Frozen once DOI registration starts |
+| Tasks | `PATCH /admin/manuscripts/{id}/production-tasks/{task}` task = TYPESETTING, PROOFREADING, FORMATTING_CHECK; body `{status:"DONE", notes}`. AUTHOR_FINAL_APPROVAL is set by the author endpoint, DOI_REGISTRATION by the worker; never editable from the UI |
+| Register DOI | `POST /admin/manuscripts/{id}/register-doi` (no body) -> 202 + record. Preconditions: current proof approved and all four non-DOI tasks DONE |
+| DOI status | `GET /admin/manuscripts/{id}/doi-status`; poll every few seconds, stop on REGISTERED, FAILED, navigation away or bounded timeout. NOT_STARTED = no registration; PENDING = queued; FAILED = operator issue |
+| Publish | `POST /admin/manuscripts/{id}/publish` (no body). 200 returns the article; save `response.id` as articleId and open `GET /articles/{articleId}`. Never derive from manuscript ID. Repeating returns the existing article |
+
+**DOI release gate:** with the DOI provider disabled, register-doi returns 503; with sandbox registration enabled it can return a `sandbox:` identifier and publish rejects it with 409. **Keep Publish unavailable on production** (show "Live DOI registration pending") until live Crossref is integrated. Test success only against a non-production sandbox.
+
+### Super Admin / governance (document section 5)
+| Screen | Endpoint and behaviour |
+|---|---|
+| Dashboard | `GET /admin/dashboard` (STAFF and SUPER_ADMIN). Use server counters; render `null` averages as unavailable |
+| Employees | `GET/POST /admin/employees`, `PATCH/DELETE /admin/employees/{userId}`. Invite form: name, email, role (STAFF\|EDITOR\|SUPER_ADMIN). 201 = "invitation queued"; `email_verified` is false until accepted. DELETE deactivates; last active SUPER_ADMIN is protected. SUPER_ADMIN invites need an approved internal domain |
+| Editor applications | `GET /admin/applications?status=PENDING`, `GET /admin/applications/{id}`, `POST .../approve` or `/reject` (no body). Approval of a new editor queues the Create-password email; a role conflict needs the operator |
+| Inquiries | `GET /admin/inquiries`, `PATCH /admin/inquiries/{id}` (no body = resolve) |
+| Categories | `POST /admin/categories` {name, description, color_gradient, display_order}; omit `id` |
+| Journals | `POST /admin/journals` {category_id, title, issn `1234-567X`, description}; omit `id`. ISSN is required today; explain this in the form |
+| APC waivers | Author `POST /manuscripts/{id}/apc-waiver`; STAFF/SUPER_ADMIN `GET /admin/apc-waivers`, `POST /admin/apc-waivers/{waiverId}/approve` or `/reject` (no body) |
+| Settings | `GET/PUT /admin/settings`; only top-level keys `contact_directory`, `site_metadata`, `publishing_information`, each an object. Never store credentials |
+| Policies | `PUT /admin/policies/{slug}` {title, content_markdown}; public `GET /policies/{slug}` |
+
 Ops only (not used by UI): `GET /health`, `GET /ready`, `GET /`.
+
+### Do NOT build (no backend support)
+Journal/category edit or delete, full editorial catalog CRUD, author source-version download, automated plagiarism scanning, article full text and references, live DOI registration.
+
+### Status labels and button rules
+| API status | Display | Normal next action |
+|---|---|---|
+| SUBMITTED | Awaiting screening | Staff claims or screens |
+| CORRECTIONS_REQUESTED | Screening corrections requested | Author uploads revised source |
+| ASSIGNED_TO_EDITOR | With editor | Assigned editor reviews and decides |
+| REVISIONS_REQUESTED | Editor revisions requested | Author uploads revised source |
+| ACCEPTED | Accepted, in production | Production staff and author work through proof tasks |
+| REJECTED | Rejected | Read decision and history |
+| PUBLISHED | Published | Open the public article |
+
+Show buttons from role + status + ownership + version; backend stays authoritative. After any successful mutation reload the detail and affected lists. On a race or stale state (409), refresh instead of forcing the action.
 
 ## 4. Phased plan (commit to `develop` after each phase; no builds, only `npm run dev` + `npm run lint`)
 
@@ -129,11 +177,23 @@ Admin status labels in the current mock UI (New / In Review / Accepted / Rejecte
 5. **Token storage:** refresh/logout take the refresh token in the request body, so it must live in JS-accessible storage. Plan: access token in memory; refresh token in `sessionStorage` (or `localStorage` when `remember_me`). Mitigate with no `dangerouslySetInnerHTML` on unsanitised data and a CSP when deployed.
 6. **Testing target:** write actions on production create real records and send real emails. Use a local backend, or ask the operator to add the exact dev origin (e.g. `http://localhost:5173`) to `CORS_ORIGINS` and use approved test accounts.
 7. **Hosting (later):** cPanel needs an SPA rewrite to `index.html` for `/verify-email`, `/reset-password` and other deep links.
-8. **Still awaited:** remaining backend document sections (editor review, revisions, proofs, production tasks, publish, admin), including valid manuscript statuses and production task names.
+8. **Extra backend docs** (`SCIENTRA_SWAGGER_MANUAL_TESTING.md`, `EMPLOYEE_ASSIGNMENTS.md`, `IMPLEMENTATION_STATUS.md`, `PRODUCTION_EMAIL.md`) were referenced but not shared. Request them for exact response fields and ownership rules.
+9. **Existing admin UI vs real workflow:** the current admin screens (Employees, Applications, Manuscripts) are mockups. The real workflow needs more role-specific screens (staff queue, editor workspace, production, DOI). Same decision as item 2.
 
 ## 6. Contract status
 
 | Area | Status |
 |---|---|
-| Auth, public, author submit, staff screening | Documented, ready to build |
-| Editor, revisions, proofs, production, DOI, admin | Schema only; wait for document before building |
+| Auth, public, author, staff screening, editor, revisions, proofs, production, DOI, publish, admin | Fully documented |
+| Remaining unknowns | Exact response shapes (use Swagger per screen), settings nested shape (product decision) |
+
+## 7. Acceptance checklist (from backend handoff)
+
+- [ ] Route guards verified with all four roles (AUTHOR, EDITOR, STAFF, SUPER_ADMIN).
+- [ ] Multipart submission works with two authors and a dummy PDF.
+- [ ] Claim conflict (409), screening correction and editor revision tested separately; editor ACCEPT moves the screening employee into production.
+- [ ] Stale proof approval returns 409; a new proof clears approval.
+- [ ] A user cannot open another author's manuscript or act in a role they do not have.
+- [ ] Downloads exercised in local and S3 modes.
+- [ ] DOI and publish tested on a non-production sandbox only.
+- [ ] Verified on the real browser/API origins.
