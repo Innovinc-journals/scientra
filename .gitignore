@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Environment files (secrets) - never commit. Use .env.example as the template.
+.env
+.env.*
+!.env.example
 dist-ssr
 *.local
 *.zip
