@@ -156,8 +156,8 @@ Show buttons from role + status + ownership + version; backend stays authoritati
 
 | Phase | Scope | Touches |
 |---|---|---|
-| 0 | `.env.example` (`VITE_API_BASE_URL`), `http.js`, error normaliser, session store, `AuthContext`, `ProtectedRoute`, role routing, 401 single-flight refresh | new files, `main.jsx`, `App.jsx` |
-| 1 | Login, Register, Forgot/Reset password, Verify email (+ resend, cooldown), Logout, session restore | `Login.jsx`, `Register.jsx`, new routes |
+| 0 | **DONE (develop).** `.env.example` (`VITE_API_BASE_URL`), `http.js`, error normaliser, session store, `AuthContext`, `ProtectedRoute`, role routing, 401 single-flight refresh | `src/api/*`, `src/auth/*`, `main.jsx`, `App.jsx` |
+| 1 | **DONE (develop).** Login, Register, Forgot/Reset password, Verify email (+ resend, cooldown), logout, session restore, admin route guards by role | `Login.jsx`, `Register.jsx`, `ForgotPassword.jsx`, `ResetPassword.jsx`, `VerifyEmail.jsx`, `AdminLayout.jsx` |
 | 2 | Public read APIs behind `apiClient.js` with **response adapters** so existing UI props stay unchanged; News, policies, contact, apply-editor, bookmarks, view count, downloads | `apiClient.js`, `News.jsx`, `ApplyEditor.jsx`, contact page |
 | 3 | Author: submit (replaces Drive), my-submissions, detail, revision upload, proof approve, APC waiver | `AuthorSubmit.jsx` + new author pages |
 | 4 | Staff: queue, claim, detail, source download, screening checks, screening decision, assign editor | `AdminManuscripts.jsx` + detail |
@@ -168,17 +168,20 @@ Show buttons from role + status + ownership + version; backend stays authoritati
 
 Admin status labels in the current mock UI (New / In Review / Accepted / Rejected) must be mapped from real backend states (`SUBMITTED`, `ASSIGNED_TO_EDITOR`, `ACCEPTED`, `REJECTED`, ...), not hardcoded.
 
-## 5. Decisions needed (UI is frozen, so these need approval)
+## 5. Decisions
 
-1. **Co-authors:** the current form takes comma-separated names, but the API needs per-author first/last name, email, affiliation, one corresponding author, and the signed-in author included. This cannot be met without a small UI change (author rows). Needs approval or the actual designed screen.
-2. **New screens:** verify-email, reset-password, forgot-password, author dashboard/detail, staff queue/detail, editor reviews, production and proof approval do not exist in the current UI. Share the designed screens; otherwise I reuse the existing Card/Button/Badge components and the admin layout.
-3. **Journal/article shape:** the current UI uses camelCase fields (`impactFactor`, `coverImage`, `chiefEditor`, ...). Adapters will map API fields to those; any field the API lacks must be agreed (hide vs keep static).
+**Resolved (owner, 2026-11-16):**
+1. Co-authors: add per-author rows to the submit form, styled like the existing form (Phase 3).
+2. New role screens: build them in the same visual style (existing Card/Button/Badge/AdminLayout); no off-style UI.
+3. Journal/article shape: adapters keep existing UI props (Phase 2).
+
+**Open:**
 4. **Editor picker gap:** `GET /admin/employees` is SUPER_ADMIN only. Staff cannot list editors; agree an operator-provided editor ID or SUPER_ADMIN assigns, until a staff-readable lookup exists.
-5. **Token storage:** refresh/logout take the refresh token in the request body, so it must live in JS-accessible storage. Plan: access token in memory; refresh token in `sessionStorage` (or `localStorage` when `remember_me`). Mitigate with no `dangerouslySetInnerHTML` on unsanitised data and a CSP when deployed.
-6. **Testing target:** write actions on production create real records and send real emails. Use a local backend, or ask the operator to add the exact dev origin (e.g. `http://localhost:5173`) to `CORS_ORIGINS` and use approved test accounts.
-7. **Hosting (later):** cPanel needs an SPA rewrite to `index.html` for `/verify-email`, `/reset-password` and other deep links.
-8. **Extra backend docs** (`SCIENTRA_SWAGGER_MANUAL_TESTING.md`, `EMPLOYEE_ASSIGNMENTS.md`, `IMPLEMENTATION_STATUS.md`, `PRODUCTION_EMAIL.md`) were referenced but not shared. Request them for exact response fields and ownership rules.
-9. **Existing admin UI vs real workflow:** the current admin screens (Employees, Applications, Manuscripts) are mockups. The real workflow needs more role-specific screens (staff queue, editor workspace, production, DOI). Same decision as item 2.
+5. **Token storage (implemented):** access token in memory; refresh token in `sessionStorage`, or `localStorage` when "Remember me" is ticked. Mitigate with no `dangerouslySetInnerHTML` on unsanitised data and a CSP when deployed.
+6. **Testing target:** not yet answered. Local `.env` currently points to the production origin. Write actions on production create real records and send real emails: use approved test accounts only, or a local backend. Calls from `http://localhost:5173` to production need that exact origin in the backend's `CORS_ORIGINS`.
+7. **Hosting (later):** cPanel needs an SPA rewrite to `index.html` for `/verify-email`, `/reset-password`, `/forgot-password` and other deep links.
+8. **Extra backend docs** (`SCIENTRA_SWAGGER_MANUAL_TESTING.md`, `EMPLOYEE_ASSIGNMENTS.md`, `IMPLEMENTATION_STATUS.md`, `PRODUCTION_EMAIL.md`) were referenced but not shared.
+9. **OAuth buttons** (Google/GitHub on Login) are not wired; planned for phase 8 once the backend provider is configured (503 = unconfigured).
 
 ## 6. Contract status
 

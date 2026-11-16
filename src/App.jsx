@@ -36,6 +36,20 @@ import NotFound from './pages/NotFound'
 import AdminApplications from './pages/admin/AdminApplications'
 import AdminEmployees from './pages/admin/AdminEmployees'
 import AdminManuscripts from './pages/admin/AdminManuscripts'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import VerifyEmail from './pages/VerifyEmail'
+import { ProtectedRoute } from './auth/ProtectedRoute'
+import { useAuth } from './auth/AuthContext'
+import { ROLES, roleHome } from './auth/roles'
+
+const ADMIN_ROLES = [ROLES.STAFF, ROLES.SUPER_ADMIN]
+
+// /admin landing: send each role to the first screen it may use.
+function AdminIndex() {
+  const { user } = useAuth()
+  return <Navigate to={roleHome(user?.role)} replace />
+}
 
 function App() {
   return (
@@ -65,6 +79,9 @@ function App() {
           <Route path="submit" element={<AuthorSubmit />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="reset-password" element={<ResetPassword />} />
+          <Route path="verify-email" element={<VerifyEmail />} />
           <Route path="apply-editor" element={<ApplyEditor />} />
           <Route path="articles" element={<Navigate to="/journals" replace />} />
           <Route path="articles/:articleId" element={<ArticleDetails />} />
@@ -91,12 +108,19 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
 
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="employees" replace />} />
-          <Route path="employees" element={<AdminEmployees />} />
-          <Route path="applications" element={<AdminApplications />} />
-          <Route path="manuscripts" element={<AdminManuscripts />} />
-          <Route path="settings" element={<JournalPlaceholderPage title="Admin Settings" />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute roles={ADMIN_ROLES}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminIndex />} />
+          <Route path="employees" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><AdminEmployees /></ProtectedRoute>} />
+          <Route path="applications" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><AdminApplications /></ProtectedRoute>} />
+          <Route path="manuscripts" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminManuscripts /></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]}><JournalPlaceholderPage title="Admin Settings" /></ProtectedRoute>} />
         </Route>
       </Routes>
     </>

@@ -3,6 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, Mail, Lock, User, Building, ArrowRight } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { FormError, FieldError } from '../components/auth/AuthCard'
+import { useAuth } from '../auth/AuthContext'
+import { toApiError, fieldErrorMap } from '../api/errors'
+import { validatePassword } from '../utils/passwordRules'
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -13,20 +17,50 @@ export default function Register() {
     confirmPassword: ''
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const navigate = useNavigate()
+  const { register } = useAuth()
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault()
+    setError('')
+    setFieldErrors({})
+
+    const passwordProblem = validatePassword(formData.password)
+    if (passwordProblem) {
+      setFieldErrors({ password: passwordProblem })
+      return
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setFieldErrors({ confirmPassword: 'Passwords do not match.' })
+      return
+    }
+
     setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const institution = formData.institution.trim()
+      await register({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        institution: institution || null,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+      })
+      // Session saved and /auth/me loaded: ask the new author to verify their email.
+      navigate('/verify-email', { replace: true })
+    } catch (err) {
+      const apiErr = toApiError(err)
+      const mapped = fieldErrorMap(apiErr, { confirm_password: 'confirmPassword' })
+      if (Object.keys(mapped).length) setFieldErrors(mapped)
+      else setError(apiErr.message)
+    } finally {
       setIsLoading(false)
-      navigate('/')
-    }, 1500)
+    }
   }
 
   return (
@@ -48,6 +82,7 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
+          <FormError message={error} />
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-navy-900">Full Name</label>
             <div className="relative">
@@ -64,6 +99,7 @@ export default function Register() {
                 placeholder="Dr. Jane Doe"
               />
             </div>
+            <FieldError message={fieldErrors.name} />
           </div>
 
           <div className="space-y-1.5">
@@ -82,6 +118,7 @@ export default function Register() {
                 placeholder="jane.doe@university.edu"
               />
             </div>
+            <FieldError message={fieldErrors.email} />
           </div>
 
           <div className="space-y-1.5">
@@ -99,6 +136,7 @@ export default function Register() {
                 placeholder="University Name"
               />
             </div>
+            <FieldError message={fieldErrors.institution} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -118,6 +156,7 @@ export default function Register() {
                   placeholder="••••••••"
                 />
               </div>
+              <FieldError message={fieldErrors.password} />
             </div>
 
             <div className="space-y-1.5">
@@ -136,6 +175,7 @@ export default function Register() {
                   placeholder="••••••••"
                 />
               </div>
+              <FieldError message={fieldErrors.confirmPassword} />
             </div>
           </div>
 

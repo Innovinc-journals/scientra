@@ -1,18 +1,36 @@
 import React from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpen, Users, FileText, Settings, LogOut, LayoutDashboard } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { useAuth } from '../auth/AuthContext'
+import { ROLES } from '../auth/roles'
 
 export function AdminLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
-  const navItems = [
-    { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { name: 'Employees', path: '/admin/employees', icon: <Users className="w-5 h-5" /> },
-    { name: 'Applications', path: '/admin/applications', icon: <FileText className="w-5 h-5" /> },
-    { name: 'Manuscripts', path: '/admin/manuscripts', icon: <FileText className="w-5 h-5" /> },
-    { name: 'Settings', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
+  const allNavItems = [
+    { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
+    { name: 'Employees', path: '/admin/employees', icon: <Users className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
+    { name: 'Applications', path: '/admin/applications', icon: <FileText className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
+    { name: 'Manuscripts', path: '/admin/manuscripts', icon: <FileText className="w-5 h-5" />, roles: [ROLES.STAFF, ROLES.SUPER_ADMIN] },
+    { name: 'Settings', path: '/admin/settings', icon: <Settings className="w-5 h-5" />, roles: [ROLES.SUPER_ADMIN] },
   ]
+  const navItems = allNavItems.filter((item) => item.roles.includes(user?.role))
+
+  const displayName = user?.name || 'Admin User'
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join('') || 'AD'
+
+  const handleSignOut = async () => {
+    await logout()
+    navigate('/', { replace: true })
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -50,17 +68,17 @@ export function AdminLayout() {
         <div className="p-4 border-t border-white/10 shrink-0">
           <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl mb-4 border border-white/10">
             <div className="w-8 h-8 rounded-full bg-primary-500 text-navy-950 font-bold flex items-center justify-center text-sm">
-              AD
+              {initials}
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-white">Admin User</span>
-              <span className="text-[10px] text-gray-400">admin@scientrajournals.org</span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-white truncate">{displayName}</span>
+              <span className="text-[10px] text-gray-400 truncate">{user?.email}</span>
             </div>
           </div>
-          <Link to="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors font-medium text-sm">
+          <button type="button" onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors font-medium text-sm">
             <LogOut className="w-5 h-5" />
             Sign Out
-          </Link>
+          </button>
         </div>
       </aside>
 

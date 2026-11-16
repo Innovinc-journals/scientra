@@ -1,28 +1,38 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, Mail, Lock, ArrowRight } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { FormError, FormNotice } from '../components/auth/AuthCard'
+import { useAuth } from '../auth/AuthContext'
+import { roleHome } from '../auth/roles'
+import { toApiError } from '../api/errors'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
+    setError('')
+    try {
+      const me = await login({ email: email.trim(), password, remember_me: rememberMe })
+      // Route by the actual role from the API. Return to the page the user was sent from, if any.
+      const from = location.state?.from
+      const target = from?.pathname && from.pathname !== '/login' ? from.pathname + (from.search || '') : roleHome(me.role)
+      navigate(target, { replace: true })
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
       setIsLoading(false)
-      // Smart Routing: Employees go to admin, others go to dashboard
-      if (email.endsWith('@scientra.org') || email.endsWith('@scientrajournals.org')) {
-        navigate('/admin')
-      } else {
-        navigate('/')
-      }
-    }, 1500)
+    }
   }
 
   return (
@@ -44,6 +54,8 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5 mt-8">
+          <FormNotice message={location.state?.notice} />
+          <FormError message={error} />
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-navy-900">Email address</label>
             <div className="relative">
@@ -84,6 +96,8 @@ export default function Login() {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600">
@@ -91,9 +105,9 @@ export default function Login() {
               </label>
             </div>
             <div className="text-sm">
-              <a href="#" className="font-semibold text-primary-600 hover:text-primary-500 transition-colors">
+              <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-500 transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 
