@@ -9,7 +9,7 @@
 ## API integration rules (frontend)
 1. HTTPS only. No `http://` API URLs outside local dev.
 2. Single axios instance in `src/api/` reading `VITE_API_BASE_URL`. No hardcoded URLs anywhere else.
-3. Auth tokens: prefer **httpOnly, Secure, SameSite cookies** set by the backend. If the backend uses bearer JWT, keep the token in memory (not `localStorage`) where possible and attach it via an axios interceptor. Confirm with the backend developer.
+3. Auth tokens: the backend returns bearer tokens in the JSON body (access ~15 min, rotating refresh token). Keep the access token in memory and attach it via an axios interceptor; send only the access token on API calls and only the refresh token to `/auth/refresh` and `/auth/logout`. Store the refresh token in `sessionStorage` (or `localStorage` only when `remember_me` is ticked). Never put tokens in URLs, logs, analytics or screenshots. Email tokens arrive in the URL fragment: read once, keep in memory, clear the fragment.
 4. Handle `401` (clear session, redirect to login) and `403` (access denied) globally.
 5. Role-based route guards for `/admin/*` and any protected page. Guards are UX only; the backend must enforce authorization on every endpoint.
 6. Never trust client checks (e.g. email domain) for roles. Role comes from the backend.
