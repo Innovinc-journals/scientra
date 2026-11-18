@@ -483,7 +483,7 @@ export default function AdminManuscriptDetail() {
             </span>
           </div>
 
-          {!manuscript.screening_employee_id && manuscript.status === MANUSCRIPT_STATUS.SUBMITTED && (
+          {!isSuperAdmin && !manuscript.screening_employee_id && manuscript.status === MANUSCRIPT_STATUS.SUBMITTED && (
             <Button type="button" size="sm" onClick={handleClaim} disabled={claiming} className="gap-1.5">
               <UserPlus className="w-4 h-4" />
               {claiming ? 'Claiming...' : 'Claim for Screening'}

@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { FormError, FormNotice } from '../../components/auth/AuthCard'
 import { api } from '../../api/apiClient'
+import { useAuth } from '../../auth/AuthContext'
+import { ROLES } from '../../auth/roles'
 import {
   getStatusMeta,
   formatIsoDateTime,
@@ -24,6 +26,8 @@ const STATUS_OPTIONS = [
 ]
 
 export default function AdminManuscripts() {
+  const { user } = useAuth()
+  const isStaff = user?.role === ROLES.STAFF
   const [assignment, setAssignment] = useState('unassigned') // unassigned | mine | all
   const [statusFilter, setStatusFilter] = useState('SUBMITTED')
   const [stageFilter, setStageFilter] = useState('SCREENING') // SCREENING | PRODUCTION
@@ -215,7 +219,7 @@ export default function AdminManuscripts() {
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {items.map((m) => {
                     const meta = getStatusMeta(m.status)
-                    const canClaim = m.status === MANUSCRIPT_STATUS.SUBMITTED && !m.screening_employee_id
+                    const canClaim = isStaff && m.status === MANUSCRIPT_STATUS.SUBMITTED && !m.screening_employee_id
                     return (
                       <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
                         <td className="py-4 px-6 max-w-md">
