@@ -412,8 +412,16 @@ export default function AdminManuscriptDetail() {
   // Latest check record for each check_type on the current source version
   const latestCheckByType = {}
   for (const c of checks) {
-    if (c.version_number && c.version_number !== currentVersion) continue
-    latestCheckByType[c.check_type] = c
+    const ver = c.version_number ?? c.source_version ?? c.version
+    if (ver != null && Number(ver) !== Number(currentVersion)) continue
+    const prev = latestCheckByType[c.check_type]
+    if (!prev) {
+      latestCheckByType[c.check_type] = c
+    } else {
+      const prevTime = prev.created_at ? new Date(prev.created_at).getTime() : 0
+      const currTime = c.created_at ? new Date(c.created_at).getTime() : 0
+      if (currTime >= prevTime) latestCheckByType[c.check_type] = c
+    }
   }
   const allThreeChecksPassed = CHECK_TYPES.every((t) => latestCheckByType[t]?.result === 'PASS')
 
@@ -720,9 +728,14 @@ export default function AdminManuscriptDetail() {
                 className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs text-navy-900"
               />
             </div>
-            <Button type="submit" variant="outline" size="sm" disabled={reassigningEditor}>
+            <Button type="submit" variant="outline" size="sm" disabled={reassigningEditor || !allThreeChecksPassed}>
               {reassigningEditor ? 'Assigning...' : 'Assign Editor'}
             </Button>
+            {!allThreeChecksPassed && (
+              <p className="text-[11px] text-amber-700">
+                Record PLAGIARISM, DUPLICATE, and FORMATTING as PASS for Source v{currentVersion} first.
+              </p>
+            )}
           </form>
         </div>
       </div>
