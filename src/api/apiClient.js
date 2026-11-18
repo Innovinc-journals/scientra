@@ -1,4 +1,4 @@
-import { JOURNALS, ARTICLES, CATEGORIES, STATS } from '../utils/data'
+import { JOURNALS, ARTICLES, CATEGORIES } from '../utils/data'
 import { http, cleanParams } from './http'
 import { downloadFromApi } from './download'
 
@@ -177,24 +177,6 @@ export function adaptNewsItem(item, index = 0) {
   }
 }
 
-function getStaticNews() {
-  return JOURNALS.reduce((acc, journal) => {
-    if (Array.isArray(journal.news)) {
-      const items = journal.news.map((item, idx) =>
-        adaptNewsItem({
-          ...item,
-          id: `${journal.id}-news-${idx}`,
-          category: journal.category || 'General Science',
-          journalId: journal.id,
-          journalTitle: journal.title,
-        }),
-      )
-      return [...acc, ...items]
-    }
-    return acc
-  }, [])
-}
-
 export const api = {
   journals: {
     list: async (params = {}) => {
@@ -212,41 +194,20 @@ export const api = {
         const cleaned = cleanParams(params)
         const data = await http.get('/journals', { params: cleaned }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) {
-          return attachListMeta(rawItems.map(adaptJournal), data)
-        }
-        if (Object.keys(cleaned).length > 0 && (data?.total ?? 0) > 0) {
-          return attachListMeta([], data)
-        }
+        return attachListMeta(rawItems.map(adaptJournal), data)
       } catch {
-        /* fall back to static catalog if offline or unseeded */
+        return []
       }
-      return JOURNALS.map(adaptJournal)
     },
     getById: async (id) => {
-      try {
-        const data = await http.get(`/journals/${encodeURIComponent(id)}`).then((r) => r.data)
-        if (data) return adaptJournal(data)
-      } catch (err) {
-        const fallback = JOURNALS.find((j) => j.id === id)
-        if (fallback) return adaptJournal(fallback)
-        throw err
-      }
-      const fallback = JOURNALS.find((j) => j.id === id)
-      if (!fallback) throw new Error('Journal not found')
-      return adaptJournal(fallback)
+      const data = await http.get(`/journals/${encodeURIComponent(id)}`).then((r) => r.data)
+      if (!data) throw new Error('Journal not found')
+      return adaptJournal(data)
     },
     getSection: async (journalId, sectionSlug) => {
-      try {
-        return await http
-          .get(`/journals/${encodeURIComponent(journalId)}/sections/${encodeURIComponent(sectionSlug)}`)
-          .then((r) => r.data)
-      } catch (err) {
-        const j = JOURNALS.find((item) => item.id === journalId)
-        const section = j?.sections?.find((s) => s.slug === sectionSlug)
-        if (section) return section
-        throw err
-      }
+      return http
+        .get(`/journals/${encodeURIComponent(journalId)}/sections/${encodeURIComponent(sectionSlug)}`)
+        .then((r) => r.data)
     },
     getVolumes: async (journalId, params = {}) => {
       try {
@@ -255,8 +216,7 @@ export const api = {
           .then((r) => r.data)
         return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
       } catch {
-        const j = JOURNALS.find((item) => item.id === journalId)
-        return j?.volumes || []
+        return []
       }
     },
     getSpecialIssues: async (journalId, params = {}) => {
@@ -266,8 +226,7 @@ export const api = {
           .then((r) => r.data)
         return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
       } catch {
-        const j = JOURNALS.find((item) => item.id === journalId)
-        return j?.specialIssues || []
+        return []
       }
     },
     getEditorialBoard: async (journalId, params = {}) => {
@@ -286,14 +245,10 @@ export const api = {
           .get(`/journals/${encodeURIComponent(journalId)}/news`, { params: cleanParams(params) })
           .then((r) => r.data)
         const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (items.length > 0) return items.map(adaptNewsItem)
+        return items.map(adaptNewsItem)
       } catch {
-        /* fallback */
+        return []
       }
-      const j = JOURNALS.find((item) => item.id === journalId)
-      return (j?.news || []).map((n, idx) =>
-        adaptNewsItem({ ...n, id: `${journalId}-news-${idx}`, journalId, journalTitle: j?.title, category: j?.category }),
-      )
     },
   },
 
@@ -313,42 +268,28 @@ export const api = {
         const cleaned = cleanParams(params)
         const data = await http.get('/articles', { params: cleaned }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) {
-          return attachListMeta(rawItems.map(adaptArticle), data)
-        }
-        if (Object.keys(cleaned).length > 0 && (data?.total ?? 0) > 0) {
-          return attachListMeta([], data)
-        }
+        return attachListMeta(rawItems.map(adaptArticle), data)
       } catch {
-        /* fall back to static articles */
+        return []
       }
-      return ARTICLES.map(adaptArticle)
     },
     getTrending: async (params = {}) => {
       try {
         const data = await http.get('/articles/trending', { params: cleanParams(params) }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) return rawItems.map(adaptArticle)
+        return rawItems.map(adaptArticle)
       } catch {
-        /* fallback */
+        return []
       }
-      return [...ARTICLES]
-        .map(adaptArticle)
-        .sort((a, b) => (b.views || 0) - (a.views || 0))
-        .slice(0, 5)
     },
     getMostViewed: async (params = {}) => {
       try {
         const data = await http.get('/articles/most-viewed', { params: cleanParams(params) }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) return rawItems.map(adaptArticle)
+        return rawItems.map(adaptArticle)
       } catch {
-        /* fallback */
+        return []
       }
-      return [...ARTICLES]
-        .map(adaptArticle)
-        .sort((a, b) => (b.views || 0) - (a.views || 0))
-        .slice(0, 4)
     },
     getByJournal: async (journalId, params = {}) => {
       try {
@@ -356,40 +297,27 @@ export const api = {
           .get(`/journals/${encodeURIComponent(journalId)}/articles`, { params: cleanParams(params) })
           .then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) return rawItems.map(adaptArticle)
+        return rawItems.map(adaptArticle)
       } catch {
-        /* fallback */
+        return []
       }
-      return ARTICLES.filter((a) => a.journalId === journalId).map(adaptArticle)
     },
     getByJournalAndSection: async (journalId, sectionId) => {
       try {
         const sec = await http
           .get(`/journals/${encodeURIComponent(journalId)}/sections/${encodeURIComponent(sectionId)}`)
           .then((r) => r.data)
-        if (Array.isArray(sec?.articles) && sec.articles.length > 0) {
-          return sec.articles.map(adaptArticle)
-        }
-        if (Array.isArray(sec?.items) && sec.items.length > 0) {
-          return sec.items.map(adaptArticle)
-        }
+        if (Array.isArray(sec?.articles)) return sec.articles.map(adaptArticle)
+        if (Array.isArray(sec?.items)) return sec.items.map(adaptArticle)
+        return []
       } catch {
-        /* fallback */
+        return []
       }
-      return ARTICLES.filter((a) => a.journalId === journalId && a.sectionId === sectionId).map(adaptArticle)
     },
     getById: async (id) => {
-      try {
-        const data = await http.get(`/articles/${encodeURIComponent(id)}`).then((r) => r.data)
-        if (data) return adaptArticle(data)
-      } catch (err) {
-        const fallback = ARTICLES.find((a) => a.id === id)
-        if (fallback) return adaptArticle(fallback)
-        throw err
-      }
-      const fallback = ARTICLES.find((a) => a.id === id)
-      if (!fallback) throw new Error('Article not found')
-      return adaptArticle(fallback)
+      const data = await http.get(`/articles/${encodeURIComponent(id)}`).then((r) => r.data)
+      if (!data) throw new Error('Article not found')
+      return adaptArticle(data)
     },
     getRelated: async (id, params = {}) => {
       try {
@@ -397,15 +325,10 @@ export const api = {
           .get(`/articles/${encodeURIComponent(id)}/related`, { params: cleanParams(params) })
           .then((r) => r.data)
         const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (items.length > 0) return items.map(adaptArticle)
+        return items.map(adaptArticle)
       } catch {
-        /* fallback */
+        return []
       }
-      const current = ARTICLES.find((a) => a.id === id)
-      if (!current) return []
-      return ARTICLES.filter((a) => a.journalId === current.journalId && a.id !== id)
-        .slice(0, 3)
-        .map(adaptArticle)
     },
     recordView: async (id) => {
       try {
@@ -426,11 +349,10 @@ export const api = {
       try {
         const data = await http.get('/categories', { params: cleanParams(params) }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) return rawItems.map(adaptCategory)
+        return rawItems.map(adaptCategory)
       } catch {
-        /* fallback */
+        return []
       }
-      return CATEGORIES.map(adaptCategory)
     },
   },
 
@@ -440,15 +362,18 @@ export const api = {
         const data = await http.get('/stats').then((r) => r.data)
         if (data && typeof data === 'object') {
           return {
-            ...STATS,
-            ...data,
+            authors: data.authors ?? 0,
+            institutions: data.institutions ?? 0,
+            downloads: data.downloads ?? 0,
+            papers: data.papers ?? 0,
+            editors: data.editors ?? 0,
             countries: data.countries ?? null,
           }
         }
       } catch {
         /* fallback */
       }
-      return STATS
+      return { authors: 0, institutions: 0, downloads: 0, papers: 0, editors: 0, countries: null }
     },
   },
 
@@ -457,27 +382,14 @@ export const api = {
       try {
         const data = await http.get('/news', { params: cleanParams(params) }).then((r) => r.data)
         const rawItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-        if (rawItems.length > 0) {
-          return attachListMeta(rawItems.map(adaptNewsItem), data)
-        }
+        return attachListMeta(rawItems.map(adaptNewsItem), data)
       } catch {
-        /* fallback */
+        return []
       }
-      const staticItems = getStaticNews()
-      if (params?.category && params.category !== 'All') {
-        return staticItems.filter((n) => n.category === params.category)
-      }
-      return staticItems
     },
     getById: async (id) => {
-      try {
-        const data = await http.get(`/news/${encodeURIComponent(id)}`).then((r) => r.data)
-        return adaptNewsItem(data)
-      } catch (err) {
-        const found = getStaticNews().find((n) => n.id === id)
-        if (found) return found
-        throw err
-      }
+      const data = await http.get(`/news/${encodeURIComponent(id)}`).then((r) => r.data)
+      return adaptNewsItem(data)
     },
   },
 
