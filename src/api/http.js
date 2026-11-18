@@ -3,7 +3,9 @@ import { session } from '../auth/session'
 import { toApiError } from './errors'
 
 // VITE_API_BASE_URL is the API *origin* only; /api/v1 is appended exactly once here.
-const ORIGIN = (import.meta.env.VITE_API_BASE_URL || '')
+// Falls back to the public production API origin when unset (e.g. fresh Vercel deploy without env var).
+const DEFAULT_API_ORIGIN = 'https://api.scientrajournals.org'
+const ORIGIN = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_ORIGIN)
   .trim()
   .replace(/\/+$/, '')
   .replace(/\/api\/v1$/, '')

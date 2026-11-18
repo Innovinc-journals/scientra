@@ -1,8 +1,12 @@
 # Git Workflow
 
 - `main` = production (what is live on cPanel). **Only pushed to when the owner explicitly says "push to main".**
-- `develop` = ongoing work. Every finished implementation is committed and pushed here first.
+- `develop` = ongoing work & Vercel testing/staging. Every finished implementation is committed and pushed here first.
 - Feature work may branch from `develop` (e.g. `feature/auth`) and merge back into `develop`.
+
+## Deployment flow (Vercel testing -> cPanel production)
+1. **Vercel (testing):** deploys from `develop` using `vercel.json` (SPA rewrite + security headers). Set `VITE_API_BASE_URL=https://api.scientrajournals.org` in Vercel Environment Variables, and ask the backend operator to add the exact Vercel URL to `CORS_ORIGINS`.
+2. **cPanel (production):** only after Vercel testing passes and the owner says "push to main". Add an `.htaccess` SPA rewrite to `index.html` on cPanel when deploying there. Keep `.env`, tokens, and internal docs private.
 
 ## Rules
 1. Never commit directly to `main` without explicit owner approval.
