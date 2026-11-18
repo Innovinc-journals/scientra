@@ -11,21 +11,31 @@ export function JournalLayout() {
   const location = useLocation()
   const [journal, setJournal] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const isOverview = location.pathname === journalPath(journalId)
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const journalData = await api.journals.getById(journalId)
-        setJournal(journalData)
-      } catch (error) {
-        console.error('Failed to fetch journal details', error)
-      } finally {
-        setLoading(false)
-      }
+    let alive = true
+    setLoading(true)
+    setError('')
+    api.journals
+      .getById(journalId)
+      .then((journalData) => {
+        if (alive) setJournal(journalData)
+      })
+      .catch((err) => {
+        if (alive) {
+          setJournal(null)
+          setError(err?.message || 'Unable to load journal')
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
     }
-    fetchData()
   }, [journalId])
 
   if (loading) {
@@ -37,7 +47,19 @@ export function JournalLayout() {
   }
 
   if (!journal) {
-    return <div className="text-center py-20 text-2xl font-bold text-navy-950">Journal not found</div>
+    return (
+      <div className="text-center py-20 px-4 space-y-4">
+        <h2 className="text-2xl font-bold text-navy-950">{error || 'Journal not found'}</h2>
+        <div className="flex justify-center gap-3">
+          <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+          <Link to="/journals">
+            <Button>Browse All Journals</Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

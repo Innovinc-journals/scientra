@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Lock, KeyRound, ArrowRight } from 'lucide-react'
+import { Lock, KeyRound, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { AuthCard, FormError, FieldError, authInputClass } from '../components/auth/AuthCard'
 import { authApi } from '../api/authApi'
@@ -14,6 +14,8 @@ export default function CreatePassword() {
   const [manualToken, setManualToken] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -100,14 +102,22 @@ export default function CreatePassword() {
               <Lock className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={authInputClass}
+              className={`${authInputClass} pr-11`}
               placeholder="••••••••"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
           <p className="text-xs text-gray-500">{PASSWORD_HINT}</p>
           <FieldError message={fieldErrors.password} />
@@ -120,14 +130,22 @@ export default function CreatePassword() {
               <Lock className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="password"
+              type={showConfirm ? 'text' : 'password'}
               required
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className={authInputClass}
+              className={`${authInputClass} pr-11`}
               placeholder="••••••••"
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((v) => !v)}
+              aria-label={showConfirm ? 'Hide password' : 'Show password'}
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
           <FieldError message={fieldErrors.confirm_password} />
         </div>
