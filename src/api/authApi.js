@@ -13,6 +13,7 @@ export const authApi = {
   resendVerification: () => http.post('/auth/resend-verification').then((r) => r.data),
   forgotPassword: (email) => http.post('/auth/forgot-password', { email }, pub).then((r) => r.data),
   resetPassword: (body) => http.post('/auth/reset-password', body, pub).then((r) => r.data),
+  acceptInvite: (body) => http.post('/auth/accept-invite', body, pub).then((r) => r.data),
   oauthStart: (provider) =>
     http.get(`/auth/oauth/${encodeURIComponent(provider)}/start`, oauthCfg).then((r) => r.data),
   oauthCallback: (provider, body) =>

@@ -29,6 +29,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import CreatePassword from './pages/CreatePassword'
 import VerifyEmail from './pages/VerifyEmail'
 import OAuthCallback from './pages/OAuthCallback'
 import ApplyEditor from './pages/ApplyEditor'
@@ -95,6 +96,8 @@ function App() {
           <Route path="register" element={<Register />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
+          <Route path="create-password" element={<CreatePassword />} />
+          <Route path="accept-invite" element={<CreatePassword />} />
           <Route path="verify-email" element={<VerifyEmail />} />
           <Route path="auth/oauth/:provider/callback" element={<OAuthCallback />} />
           <Route path="auth/oauth/:provider" element={<OAuthCallback />} />
